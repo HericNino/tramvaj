@@ -19,7 +19,7 @@ import logging
 import time
 from datetime import timedelta
 
-from confluent_kafka import ConsumerGroupState
+from confluent_kafka import ConsumerGroupState, KafkaError, KafkaException
 from confluent_kafka.admin import AdminClient
 from quixstreams import Application
 from quixstreams.dataframe.windows import Collect, Count, Max, Mean
@@ -170,6 +170,13 @@ def run(broker: str, grace: timedelta = GRACE, **kwargs) -> None:
     app.run()
 
 
+COORDINATOR_NOT_READY = {
+    KafkaError.NOT_COORDINATOR,
+    KafkaError.COORDINATOR_NOT_AVAILABLE,
+    KafkaError.COORDINATOR_LOAD_IN_PROGRESS,
+}
+
+
 def wait_until_running(broker: str, group: str = GROUP, timeout_s: float = 120) -> None:
     """Block until the processor's consumer group is stable and has the positions topic assigned.
 
@@ -177,11 +184,20 @@ def wait_until_running(broker: str, group: str = GROUP, timeout_s: float = 120) 
     partition at a time. After regrouping by line, one partition's events arrive far ahead
     of another's, the windows' grace runs out and the late ones are dropped. In CI the
     processor took about 15 seconds to join; a fixed sleep before producing was not enough.
+
+    On a fresh broker the group coordinator isn't ready for the first seconds; those answers
+    mean "ask again", not failure.
     """
     admin = AdminClient({"bootstrap.servers": broker})
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
-        description = admin.describe_consumer_groups([group])[group].result()
+        try:
+            description = admin.describe_consumer_groups([group])[group].result()
+        except KafkaException as e:
+            if e.args[0].code() not in COORDINATOR_NOT_READY:
+                raise
+            time.sleep(1)
+            continue
         assigned = {tp.topic for member in description.members for tp in member.assignment.topic_partitions}
         if description.state == ConsumerGroupState.STABLE and topics.POSITIONS.name in assigned:
             return
