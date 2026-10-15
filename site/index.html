@@ -15,87 +15,89 @@
   </head>
   <body>
     <div class="app">
-      <header class="board" aria-live="off">
-        <div class="board-line">
-          <span class="board-name">Tramvaj</span>
-          <time class="board-clock" id="clock">--:--</time>
-        </div>
-        <div class="board-line board-small">
-          <span id="status">spajam se</span>
-          <span id="count"></span>
-        </div>
-        <div class="player" id="player" hidden>
-          <button class="play" id="play" type="button" aria-label="Zaustavi"></button>
-          <input class="scrub" id="scrub" type="range" aria-label="Vrijeme u snimci" />
-          <div class="speeds" id="speeds" role="group" aria-label="Brzina reprodukcije">
-            <button type="button" data-speed="1" aria-pressed="false">1×</button>
-            <button type="button" data-speed="10" aria-pressed="true">10×</button>
-            <button type="button" data-speed="60" aria-pressed="false">60×</button>
-          </div>
-          <span class="span" id="replay-span"></span>
-        </div>
-      </header>
-
       <div class="map" id="map" role="region" aria-label="Karta Zagreba s vozilima"></div>
 
-      <div class="legend" id="legend">
-        <div class="legend-scale" role="list" aria-label="Brzina vozila">
-          <span role="listitem"><i class="dot s0"></i>stoji</span>
-          <span role="listitem"><i class="dot s1"></i>do 12</span>
-          <span role="listitem"><i class="dot s2"></i>12 do 25</span>
-          <span role="listitem"><i class="dot s3"></i>brže</span>
-          <span class="unit">km/h</span>
+      <div class="sheet">
+        <header class="board" aria-live="off">
+          <div class="board-line">
+            <span class="board-name">Tramvaj</span>
+            <time class="board-clock" id="clock">--:--</time>
+          </div>
+          <div class="board-line board-small">
+            <span id="status">spajam se</span>
+            <span id="count"></span>
+          </div>
+          <div class="player" id="player" hidden>
+            <button class="play" id="play" type="button" aria-label="Zaustavi"></button>
+            <input class="scrub" id="scrub" type="range" aria-label="Vrijeme u snimci" />
+            <div class="speeds" id="speeds" role="group" aria-label="Brzina reprodukcije">
+              <button type="button" data-speed="1" aria-pressed="false">1×</button>
+              <button type="button" data-speed="10" aria-pressed="true">10×</button>
+              <button type="button" data-speed="60" aria-pressed="false">60×</button>
+            </div>
+            <span class="span" id="replay-span"></span>
+          </div>
+        </header>
+
+        <div class="legend" id="legend">
+          <div class="legend-scale" role="list" aria-label="Brzina vozila">
+            <span role="listitem"><i class="dot s0"></i>stoji</span>
+            <span role="listitem"><i class="dot s1"></i>do 12</span>
+            <span role="listitem"><i class="dot s2"></i>12 do 25</span>
+            <span role="listitem"><i class="dot s3"></i>brže</span>
+            <span class="unit">km/h</span>
+          </div>
+          <label><input type="checkbox" id="show-buses" /> i autobusi</label>
+          <label><input type="checkbox" id="show-spots" checked /> spora mjesta</label>
         </div>
-        <label><input type="checkbox" id="show-buses" /> i autobusi</label>
-        <label><input type="checkbox" id="show-spots" checked /> spora mjesta</label>
+
+        <aside class="panel">
+
+          <section class="block">
+            <h2>Linije <span class="sub">prosječna brzina u zadnjih 5 minuta; crtkano je 12 km/h</span></h2>
+            <table class="lines" id="lines">
+              <thead>
+                <tr>
+                  <th scope="col"><span class="sr-only">Linija</span></th>
+                  <th scope="col" class="spark-h">zadnja 2 sata</th>
+                  <th scope="col" class="num">km/h</th>
+                  <th scope="col" class="num">stoji</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+            <p class="hint" id="lines-empty">Prvi prosjeci stižu pet minuta nakon pokretanja.</p>
+          </section>
+
+          <section class="block">
+            <h2>Jedan za drugim</h2>
+            <p class="note">
+              Dva tramvaja iste linije na manje od 250 m, u istom smjeru. Prvi skuplja sve putnike, drugi vozi poluprazan, a
+              na stanicama iza njih čeka se dvostruko dulje.
+            </p>
+            <ol class="alerts" id="alerts"></ol>
+            <p class="hint" id="alerts-empty">Zasad ništa.</p>
+          </section>
+
+          <section class="block">
+            <h2>Gdje stoje <span class="sub">najsporiji dijelovi grada, zadnjih 10 minuta</span></h2>
+            <ol class="spots" id="spots"></ol>
+            <p class="hint" id="spots-empty">Zasad nema dovoljno vožnji.</p>
+          </section>
+
+          <footer class="colophon">
+            <p>
+              Položaji iz ZET-ova javnog GTFS-Realtime feeda, svakih desetak sekundi, provučeni kroz Kafku. Brzina se računa iz
+              dva uzastopna položaja istog vozila.
+            </p>
+            <p class="replay-note" hidden>
+              Ovo je snimka: sat vremena ZET-ova feeda, provučen kroz isti Kafka pipeline na GitHub Actionsu i spremljen kao
+              <a href="data/replay.json">replay.json</a>. Uživo karta radi uz Kafku, vidi upute u repou.
+            </p>
+            <p><a href="https://github.com/HericNino/tramvaj">Kod i opis</a><span class="api"> · <a href="api/live">api/live</a></span></p>
+          </footer>
+        </aside>
       </div>
-
-      <aside class="panel">
-
-        <section class="block">
-          <h2>Linije <span class="sub">prosječna brzina u zadnjih 5 minuta; crtkano je 12 km/h</span></h2>
-          <table class="lines" id="lines">
-            <thead>
-              <tr>
-                <th scope="col"><span class="sr-only">Linija</span></th>
-                <th scope="col" class="spark-h">zadnja 2 sata</th>
-                <th scope="col" class="num">km/h</th>
-                <th scope="col" class="num">stoji</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-          <p class="hint" id="lines-empty">Prvi prosjeci stižu pet minuta nakon pokretanja.</p>
-        </section>
-
-        <section class="block">
-          <h2>Jedan za drugim</h2>
-          <p class="note">
-            Dva tramvaja iste linije na manje od 250 m, u istom smjeru. Prvi skuplja sve putnike, drugi vozi poluprazan, a
-            na stanicama iza njih čeka se dvostruko dulje.
-          </p>
-          <ol class="alerts" id="alerts"></ol>
-          <p class="hint" id="alerts-empty">Zasad ništa.</p>
-        </section>
-
-        <section class="block">
-          <h2>Gdje stoje <span class="sub">najsporiji dijelovi grada, zadnjih 10 minuta</span></h2>
-          <ol class="spots" id="spots"></ol>
-          <p class="hint" id="spots-empty">Zasad nema dovoljno vožnji.</p>
-        </section>
-
-        <footer class="colophon">
-          <p>
-            Položaji iz ZET-ova javnog GTFS-Realtime feeda, svakih desetak sekundi, provučeni kroz Kafku. Brzina se računa iz
-            dva uzastopna položaja istog vozila.
-          </p>
-          <p class="replay-note" hidden>
-            Ovo je snimka: sat vremena ZET-ova feeda, provučen kroz isti Kafka pipeline na GitHub Actionsu i spremljen kao
-            <a href="data/replay.json">replay.json</a>. Uživo karta radi uz Kafku, vidi upute u repou.
-          </p>
-          <p><a href="https://github.com/HericNino/tramvaj">Kod i opis</a><span class="api"> · <a href="api/live">api/live</a></span></p>
-        </footer>
-      </aside>
 
     </div>
   </body>

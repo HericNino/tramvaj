@@ -151,33 +151,49 @@ a {
   white-space: nowrap;
 }
 
-/* layout: the map takes the room, the panel is a column on the right */
+/* layout: the map fills the window; the board and the panel float over it on a sheet */
 .app {
-  display: grid;
-  grid-template-columns: 1fr 380px;
-  grid-template-rows: auto 1fr;
-  grid-template-areas: "map board" "map panel";
-  height: 100%;
   position: relative;
+  height: 100%;
+  overflow: hidden;
+  --sheet-w: 380px;
+  --gap: 16px;
 }
 
 .map {
-  grid-area: map;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   background: var(--paper);
 }
 
-.panel {
-  grid-area: panel;
-  overflow-y: auto;
-  border-left: 1px solid var(--rule);
+.sheet {
+  position: absolute;
+  top: var(--gap);
+  right: var(--gap);
+  bottom: var(--gap);
+  width: var(--sheet-w);
+  z-index: 700;
+  display: flex;
+  flex-direction: column;
   background: var(--paper);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12), 0 8px 28px rgb(0 0 0 / 0.18);
+}
+
+.panel {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--paper);
+}
+
+/* keep Leaflet's attribution out from under the sheet */
+.leaflet-bottom.leaflet-right {
+  right: calc(var(--sheet-w) + 2 * var(--gap));
 }
 
 /* the stop display: amber on black, like the ones at ZET's stops */
 .board {
-  grid-area: board;
-  border-left: 1px solid var(--board);
   background: var(--board);
   color: var(--led);
   font-family: var(--mono);
@@ -457,10 +473,10 @@ h2 .sub {
 
 /* the legend floats over the map, bottom left, like a map's key printed in its corner */
 .legend {
-  position: absolute;
-  left: 12px;
-  bottom: 22px;
-  z-index: 500;
+  position: fixed;
+  left: var(--gap);
+  bottom: 24px;
+  z-index: 700;
   background: var(--paper);
   border: 1px solid var(--rule);
   padding: 8px 12px 9px;
@@ -469,7 +485,9 @@ h2 .sub {
   flex-wrap: wrap;
   gap: 6px 16px;
   align-items: center;
-  max-width: calc(100% - 24px - 380px);
+  max-width: calc(100% - 4 * var(--gap) - var(--sheet-w));
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.12);
 }
 
 .legend-scale {
@@ -635,33 +653,51 @@ h2 .sub {
   }
 }
 
-/* phones: map on top, panel underneath */
+/* phones: the map stays full screen, the sheet comes up from the bottom and scrolls */
 @media (max-width: 760px) {
   .app {
+    --sheet-h: 46vh;
+    --sheet-h: 46svh;
+  }
+
+  .sheet {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: var(--sheet-h);
     display: block;
-    height: auto;
-  }
-
-  .map {
-    height: 62vh;
-    height: 62svh;
-  }
-
-  .panel {
-    border-left: 0;
-    overflow: visible;
+    overflow-y: auto;
+    border-radius: 12px 12px 0 0;
   }
 
   .board {
-    border-left: 0;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .panel {
+    overflow: visible;
   }
 
   .legend {
     position: static;
     max-width: none;
     border: 0;
+    border-radius: 0;
+    box-shadow: none;
     border-bottom: 1px solid var(--rule);
     padding: 10px 16px;
+  }
+
+  .leaflet-bottom {
+    bottom: var(--sheet-h);
+  }
+
+  .leaflet-bottom.leaflet-right {
+    right: 0;
   }
 
   .block,

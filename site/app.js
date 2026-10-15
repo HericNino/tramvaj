@@ -64,6 +64,22 @@ map.on("zoomstart", () => mapEl.classList.add("still"));
 map.on("zoomend", () => setTimeout(() => mapEl.classList.remove("still"), 60));
 if (!reduceMotion) mapEl.classList.add("glide");
 
+// the sheet covers the right side of the map (or its bottom on a phone): [right, bottom] in pixels
+function covered() {
+  const sheet = document.querySelector(".sheet").getBoundingClientRect();
+  const box = mapEl.getBoundingClientRect();
+  if (sheet.width < box.width * 0.9) return [box.right - sheet.left, 0];
+  return [0, box.bottom - sheet.top];
+}
+
+// fly to a place so that it ends up in the part of the map that can be seen
+function focus(bounds, maxZoom) {
+  map.flyToBounds(bounds, { maxZoom, paddingBottomRight: covered(), duration: reduceMotion ? 0 : 0.8 });
+}
+
+// centre the city in the visible part, not under the sheet
+map.panBy(covered().map((px) => px / 2), { animate: false });
+
 function css(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
@@ -318,7 +334,7 @@ function drawAlerts() {
 }
 
 function showAlert(alert) {
-  map.flyTo([alert.lat, alert.lon], 16, { duration: reduceMotion ? 0 : 0.8 });
+  focus(L.latLng(alert.lat, alert.lon).toBounds(250), 16);
   for (const id of alert.vehicles) {
     const tram = state.markers.get(id)?.getElement()?.querySelector(".tram");
     if (!tram) continue;
@@ -370,7 +386,7 @@ function drawSpots() {
         {},
         el(
           "button",
-          { type: "button", onclick: () => map.flyToBounds(cellBounds(h.cell), { maxZoom: 16, duration: reduceMotion ? 0 : 0.8 }) },
+          { type: "button", onclick: () => focus(cellBounds(h.cell), 16) },
           el("span", { class: "kmh" }, decimal.format(h.mean_kmh)),
           el(
             "span",
