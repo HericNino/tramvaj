@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="hr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Tramvaj · Zagreb uživo</title>
+    <meta name="description" content="Zagrebački tramvaji uživo: gdje su, koliko brzo voze, gdje stoje i koji se voze jedan za drugim." />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="fonts/barlow-semi-condensed-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="vendor/leaflet/leaflet.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="board" aria-live="off">
+        <div class="board-line">
+          <span class="board-name">Tramvaj</span>
+          <time class="board-clock" id="clock">--:--</time>
+        </div>
+        <div class="board-line board-small">
+          <span id="status">spajam se</span>
+          <span id="count"></span>
+        </div>
+      </header>
+
+      <div class="map" id="map" role="region" aria-label="Karta Zagreba s vozilima"></div>
+
+      <div class="legend" id="legend">
+        <div class="legend-scale" role="list" aria-label="Brzina vozila">
+          <span role="listitem"><i class="dot s0"></i>stoji</span>
+          <span role="listitem"><i class="dot s1"></i>do 12</span>
+          <span role="listitem"><i class="dot s2"></i>12 do 25</span>
+          <span role="listitem"><i class="dot s3"></i>brže</span>
+          <span class="unit">km/h</span>
+        </div>
+        <label><input type="checkbox" id="show-buses" /> i autobusi</label>
+        <label><input type="checkbox" id="show-spots" checked /> spora mjesta</label>
+      </div>
+
+      <aside class="panel">
+
+        <section class="block">
+          <h2>Linije <span class="sub">prosječna brzina u zadnjih 5 minuta; crtkano je 12 km/h</span></h2>
+          <table class="lines" id="lines">
+            <thead>
+              <tr>
+                <th scope="col"><span class="sr-only">Linija</span></th>
+                <th scope="col" class="spark-h">zadnja 2 sata</th>
+                <th scope="col" class="num">km/h</th>
+                <th scope="col" class="num">stoji</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <p class="hint" id="lines-empty">Prvi prosjeci stižu pet minuta nakon pokretanja.</p>
+        </section>
+
+        <section class="block">
+          <h2>Jedan za drugim</h2>
+          <p class="note">
+            Dva tramvaja iste linije na manje od 250 m, u istom smjeru. Prvi skuplja sve putnike, drugi vozi poluprazan, a
+            na stanicama iza njih čeka se dvostruko dulje.
+          </p>
+          <ol class="alerts" id="alerts"></ol>
+          <p class="hint" id="alerts-empty">Zasad ništa.</p>
+        </section>
+
+        <section class="block">
+          <h2>Gdje stoje <span class="sub">najsporiji dijelovi grada, zadnjih 10 minuta</span></h2>
+          <ol class="spots" id="spots"></ol>
+          <p class="hint" id="spots-empty">Zasad nema dovoljno vožnji.</p>
+        </section>
+
+        <footer class="colophon">
+          <p>
+            Položaji iz ZET-ova javnog GTFS-Realtime feeda, svakih desetak sekundi, provučeni kroz Kafku. Brzina se računa iz
+            dva uzastopna položaja istog vozila.
+          </p>
+          <p><a href="https://github.com/HericNino/tramvaj">Kod i opis</a> · <a href="api/live">api/live</a></p>
+        </footer>
+      </aside>
+
+    </div>
+  </body>
+</html>

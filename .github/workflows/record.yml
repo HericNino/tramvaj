@@ -1,0 +1,34 @@
+# Saves snapshots of ZET's live feed, to replay later with `tramvaj produce --replay`.
+# Run by hand: Actions → Record feed → Run workflow.
+name: Record feed
+
+on:
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: How many minutes to record
+        default: "60"
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked --no-dev
+      - run: uv run tramvaj record --minutes "${{ inputs.minutes }}" --out samples
+      - name: Summary
+        run: |
+          count=$(ls samples | wc -l)
+          first=$(ls samples | head -1 | cut -d. -f1)
+          last=$(ls samples | tail -1 | cut -d. -f1)
+          echo "$count snapshots, $(date -u -d @$first '+%F %R') to $(date -u -d @$last '+%R') UTC, $(du -sh samples | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zet-snapshots-${{ github.run_id }}
+          path: samples/
+          retention-days: 30

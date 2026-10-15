@@ -1,0 +1,43 @@
+[project]
+name = "tramvaj"
+version = "0.1.0"
+description = "Zagreb's trams and buses, live: ZET's realtime feed through Kafka."
+readme = "README.md"
+authors = [
+    { name = "Nino Heric" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "confluent-kafka>=2.12.2",
+    "duckdb>=1.5.6",
+    "fastapi>=0.143.2",
+    "gtfs-realtime-bindings>=3.0.0",
+    "httpx>=0.28.1",
+    "quixstreams>=3.28.1",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.32,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+]
+
+[tool.ruff]
+line-length = 140
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+markers = ["kafka: needs a Kafka broker (KAFKA_BROKER)"]
+
+[project.scripts]
+tramvaj = "tramvaj.cli:main"
