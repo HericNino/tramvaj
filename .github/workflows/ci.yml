@@ -10,22 +10,22 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      kafka:
-        image: apache/kafka:3.9.1
-        ports:
-          - 9092:9092
     env:
       KAFKA_BROKER: localhost:9092
     steps:
       - uses: actions/checkout@v4
+      # started by hand rather than as a service container, so its logs stay out of the job log
+      - run: docker run -d --name kafka -p 9092:9092 apache/kafka:3.9.1
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - name: Wait for Kafka
         run: uv run python -c "from confluent_kafka.admin import AdminClient; AdminClient({'bootstrap.servers':'localhost:9092'}).list_topics(timeout=90)"
-      - run: uv run pytest -q
+      - run: uv run pytest -q -rf
+      - name: Kafka logs
+        if: failure()
+        run: docker logs kafka 2>&1 | grep -E "WARN|ERROR" | tail -50
 
   image:
     runs-on: ubuntu-latest
