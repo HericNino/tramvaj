@@ -15,6 +15,7 @@ output and its consumer offsets are committed in one Kafka transaction.
 
 from __future__ import annotations
 
+import logging
 import time
 from datetime import timedelta
 
@@ -27,15 +28,21 @@ from quixstreams.models import TopicConfig
 from . import bunching, motion, topics
 from .geo import cell_center
 
+log = logging.getLogger("tramvaj")
+
 LINE_WINDOW = timedelta(minutes=5)
 CELL_WINDOW = timedelta(minutes=10)
 # How long a window waits for late events after its end. After regrouping by line,
-# events arrive in partition order: when one partition is ahead (a backlog after a
-# restart, a fast replay), the others' events look late. Live, a minute is plenty and
-# results come out a minute after each window; a replay at full speed needs more.
+# events arrive in the order their source partitions are read: when one is ahead (a
+# backlog after a restart, a fast replay), the others' events look late. Live, a minute
+# is plenty and results come out a minute after each window; a fast replay needs more.
 GRACE = timedelta(seconds=60)
 MIN_HOTSPOT_SAMPLES = 6
 GROUP = "tramvaj"
+# Windows close when time on their partition passes end + grace, not only when the same key
+# (line, grid cell) shows up again. With Quix's default, per key, a cell's window stayed open
+# until a tram next drove through that cell, at night until morning.
+CLOSING = "partition"
 
 
 def event_time(value, headers, timestamp, timestamp_type) -> int:
@@ -83,8 +90,10 @@ def cell_window(value: dict, key, timestamp, headers) -> dict:
 
 
 def late(value, key, timestamp_ms, late_by_ms, start, end, name, topic, partition, offset) -> bool:
-    """Count late events instead of logging each one; return False to skip Quix's warning."""
+    """Count late events and log every hundredth, instead of a warning for each one."""
     late.count += 1
+    if late.count % 100 == 1:
+        log.warning("%d events too late for their window so far (latest: %s, %d s late)", late.count, name, late_by_ms // 1000)
     return False
 
 
@@ -114,7 +123,7 @@ def build(app: Application, grace: timedelta = GRACE) -> None:
             samples=Count(),
             vehicles=Collect("vehicle_id"),
         )
-        .final()
+        .final(closing_strategy=CLOSING)
         .apply(line_window, metadata=True)
         .to_topic(out(topics.LINE_SPEED))
     )
@@ -123,7 +132,7 @@ def build(app: Application, grace: timedelta = GRACE) -> None:
     (
         by_cell.tumbling_window(CELL_WINDOW, grace_ms=grace, on_late=late)
         .agg(mean_kmh=Mean("speed_kmh"), samples=Count(), vehicles=Collect("vehicle_id"), routes=Collect("route_id"))
-        .final()
+        .final(closing_strategy=CLOSING)
         .filter(lambda w: w["samples"] >= MIN_HOTSPOT_SAMPLES)
         .apply(cell_window, metadata=True)
         .to_topic(out(topics.HOTSPOTS))

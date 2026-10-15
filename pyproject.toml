@@ -9,7 +9,6 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "confluent-kafka>=2.12.2",
-    "duckdb>=1.5.6",
     "fastapi>=0.143.2",
     "gtfs-realtime-bindings>=3.0.0",
     "httpx>=0.28.1",

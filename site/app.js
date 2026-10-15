@@ -392,6 +392,11 @@ async function refresh() {
   const response = await fetch("api/live", { cache: "no-store" });
   if (!response.ok) throw new Error(`api/live: ${response.status}`);
   const live = await response.json();
+  if (live.version < state.version) {
+    // the server restarted and counts from zero again: follow its count, or the stream sends nothing for hours
+    state.version = live.version;
+    if (stream) listen();
+  }
   state.clock = Math.max(state.clock, live.clock);
   state.version = Math.max(state.version, live.version);
   state.lines = live.lines;

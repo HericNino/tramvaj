@@ -33,7 +33,9 @@ jobs:
       - run: uv sync --locked --no-dev
       - run: docker run -d --name kafka -p 9092:9092 apache/kafka:3.9.1
       - name: Record the feed
-        run: uv run tramvaj record --minutes "${{ inputs.minutes || '60' }}" --out samples
+        run: uv run tramvaj record --minutes "$MINUTES" --out samples
+        env:
+          MINUTES: ${{ inputs.minutes || '60' }}
       - name: Run the pipeline on the recording
         run: |
           uv run tramvaj process --grace 120 --state-dir state > process.log 2>&1 &

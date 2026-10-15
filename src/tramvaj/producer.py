@@ -32,6 +32,7 @@ class Stats:
     skipped: int = 0  # unchanged since the previous snapshot
     delays: int = 0
     unreadable: int = 0
+    failed: int = 0  # not delivered after the producer's own retries
 
 
 @dataclass
@@ -55,6 +56,11 @@ class FeedProducer:
             )
         )
 
+    def delivered(self, error, message) -> None:
+        if error is not None:
+            self.stats.failed += 1
+            log.error("not delivered to %s: %s", message.topic(), error)
+
     def send(self, data: bytes) -> None:
         self.stats.snapshots += 1
         try:
@@ -62,7 +68,11 @@ class FeedProducer:
         except FeedError as error:
             # keep the raw bytes: a changed feed format is a debugging job for later
             self.stats.unreadable += 1
-            self.producer.produce(topics.DLQ.name, value=json.dumps({"error": str(error), "raw": base64.b64encode(data[:4096]).decode()}))
+            self.producer.produce(
+                topics.DLQ.name,
+                value=json.dumps({"error": str(error), "raw": base64.b64encode(data[:4096]).decode()}),
+                on_delivery=self.delivered,
+            )
             log.warning("unreadable snapshot sent to %s: %s", topics.DLQ.name, error)
             return
 
@@ -71,14 +81,18 @@ class FeedProducer:
                 self.stats.skipped += 1
                 continue
             self.last_seen[p.vehicle_id] = p.ts
-            self.producer.produce(topics.POSITIONS.name, key=p.vehicle_id, value=json.dumps(p.to_dict()), timestamp=p.ts * 1000)
+            self.producer.produce(
+                topics.POSITIONS.name, key=p.vehicle_id, value=json.dumps(p.to_dict()), timestamp=p.ts * 1000, on_delivery=self.delivered
+            )
             self.stats.positions += 1
 
         for d in snapshot.delays:
             if self.last_delay.get(d.trip_id) == (d.ts, d.delay_s):
                 continue
             self.last_delay[d.trip_id] = (d.ts, d.delay_s)
-            self.producer.produce(topics.DELAYS.name, key=d.trip_id, value=json.dumps(d.to_dict()), timestamp=d.ts * 1000)
+            self.producer.produce(
+                topics.DELAYS.name, key=d.trip_id, value=json.dumps(d.to_dict()), timestamp=d.ts * 1000, on_delivery=self.delivered
+            )
             self.stats.delays += 1
         self.producer.poll(0)
 
