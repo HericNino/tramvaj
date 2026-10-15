@@ -38,10 +38,14 @@ jobs:
           MINUTES: ${{ inputs.minutes || '60' }}
       - name: Run the pipeline on the recording
         run: |
-          uv run tramvaj process --grace 120 --state-dir state > process.log 2>&1 &
+          # straight from the venv, not through uv run: a uv process left running holds uv's
+          # cache lock, and setup-uv's cleanup then times out and fails the job
+          .venv/bin/tramvaj process --grace 120 --state-dir state > process.log 2>&1 &
+          processor=$!
           # recorded minutes ago, so the original times are well inside the topics' retention
           uv run tramvaj produce --replay samples --speed 10 --as-recorded --wait
           uv run tramvaj export --wait --out site/data/replay.json
+          kill "$processor" && wait "$processor" || true
       - name: Processor log
         if: failure()
         run: tail -50 process.log
