@@ -2,6 +2,8 @@
 
 Zagreb's trams, live. ZET publishes where every tram and bus is, about every ten seconds, as a GTFS-Realtime feed. tramvaj streams that feed through Kafka and works out what the raw positions don't say: how fast each vehicle is going, which lines are crawling, where in the city traffic stands still, and when two trams of the same line run right behind each other.
 
+**Replay: [hericnino.github.io/tramvaj](https://hericnino.github.io/tramvaj/)**: an hour of a weekday morning, recorded from the feed, run through the same Kafka pipeline on GitHub Actions and played back in the browser. The live version needs Kafka running; see [Running it](#running-it).
+
 It's a small but complete streaming pipeline: an idempotent producer, keyed and compacted topics, stateful processing with state backed up to Kafka, event-time windows that cope with late data, exactly-once processing, a dead-letter topic, and a map that updates over Server-Sent Events.
 
 ## How it works
@@ -17,6 +19,7 @@ ZET GTFS-RT feed (protobuf, whole network every ~10 s)
        │                    5-minute windows: mean speed, share stopped        → zet.line-speed
        └─ regroup by area   10-minute windows on a 250 m grid, trams only      → zet.hotspots
   └─ tramvaj serve          reads the output topics into memory, serves the map and /api/live, /api/stream (SSE)
+  └─ tramvaj export         or: writes the output topics to one JSON file the map plays back without a server
 ```
 
 | topic | key | partitions | kept | what |
@@ -42,6 +45,8 @@ ZET GTFS-RT feed (protobuf, whole network every ~10 s)
 
 - Windows wait for late events (`--grace`, 60 s by default). Live, a minute is plenty; a fast replay needs more.
 - Bunching compares two vehicles at the same moment. Each vehicle's position is projected along its heading to the other's report time before measuring the gap. Comparing raw positions, two trams 100 m apart could look hundreds of metres apart or on top of each other, depending on which one had reported last.
+
+**Start consuming before producing.** The pipeline test first waited a fixed 8 seconds for the processor before sending data. On GitHub Actions the processor took about 15 seconds to join its consumer group, the first positions piled up, and the processor then read that backlog one partition at a time: the same out-of-order problem as above, with windows missing events and a bunching alert missing. Producing without waiting reproduces it every time. Now the test, and `tramvaj produce --wait`, ask Kafka for the processor's consumer group and start once it is stable and has the positions topic assigned.
 
 **Exactly-once.** With `processing_guarantee="exactly-once"` the processor's output, its state changes and its consumer offsets are committed in one Kafka transaction. A crash between writing an alert and committing the offset can't produce the alert twice. Anything reading the output topics uses `isolation.level=read_committed`, so it never sees a transaction that was rolled back. The cost is latency: output becomes visible when the transaction commits.
 
@@ -76,6 +81,17 @@ uv sync
 uv run tramvaj process &                              # stream processor
 uv run tramvaj produce &                              # live feed, or: --replay samples --speed 10 --loop
 uv run tramvaj serve                                  # map on http://localhost:8000
+```
+
+### The replay page
+
+The **Replay page** workflow records an hour of the feed on weekday mornings (or when run by hand), starts Kafka on the runner, runs the processor on the recording at ten times the speed, and exports everything it wrote with `tramvaj export`. The map finds no API on GitHub Pages and plays back `data/replay.json` instead, with a time slider. The same works locally:
+
+```bash
+uv run tramvaj process --group replay &
+uv run tramvaj produce --replay samples --speed 10 --wait --group replay
+uv run tramvaj export --wait --out site/data/replay.json
+python -m http.server -d site                          # http://localhost:8000
 ```
 
 ### Recording the feed

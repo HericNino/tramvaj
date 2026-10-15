@@ -2,6 +2,8 @@
 
 // The map's state comes from two places: /api/live for everything once (and every
 // half minute for the windowed numbers), /api/stream for vehicles as they move.
+// Without a server (the copy on GitHub Pages) it plays back data/replay.json instead:
+// a recorded hour that went through the same Kafka pipeline in CI.
 
 const STALE_S = 180;
 const HISTORY_MS = 2 * 60 * 60 * 1000;
@@ -192,7 +194,10 @@ function drawBoard() {
   $("clock").textContent = state.clock ? hhmm.format(state.clock * 1000) : "--:--";
   const lag = Date.now() / 1000 - state.clock;
   const status = $("status");
-  if (!state.clock) {
+  if (replay.data) {
+    status.textContent = `snimka od ${day.format(state.clock * 1000)}`;
+    status.className = "";
+  } else if (!state.clock) {
     status.textContent = "čekam prve položaje";
     status.className = "";
   } else if (lag < 120) {
@@ -421,9 +426,179 @@ async function start() {
     await refresh();
     listen();
   } catch {
+    if (!replay.tried && (await startReplay())) return;
     $("status").textContent = "poslužitelj se ne javlja";
     setTimeout(start, 5000);
   }
+}
+
+// ---------------------------------------------------------------- playback without a server
+
+const replay = {
+  tried: false,
+  data: null,
+  vehicles: new Map(), // id -> tracks, absolute times
+  t: 0,
+  playing: true,
+  speed: 10,
+  shown: "", // which windows are drawn, to redraw the panel only when that changes
+};
+
+async function startReplay() {
+  replay.tried = true;
+  let data;
+  try {
+    const response = await fetch("data/replay.json");
+    if (!response.ok) return false;
+    data = await response.json();
+  } catch {
+    return false;
+  }
+  if (!data.tracks?.length) return false;
+  replay.data = data;
+  for (const track of data.tracks) {
+    const points = track.p.map(([dt, lat, lon, kmh, heading]) => ({ ts: data.start + dt, lat, lon, kmh, heading }));
+    const list = replay.vehicles.get(track.v) ?? [];
+    list.push({ route: track.r, tram: track.tram === 1, points });
+    replay.vehicles.set(track.v, list);
+  }
+  // start a quarter of an hour in, when the first windows have closed and the panel has something to show
+  replay.t = Math.min(data.end, data.start + 900);
+  mapEl.classList.remove("glide"); // positions are interpolated every frame instead
+  setupPlayer();
+  document.querySelector(".colophon .api").hidden = true;
+  document.querySelector(".colophon .replay-note").hidden = false;
+  showFrame(true);
+  requestAnimationFrame(tick);
+  return true;
+}
+
+function positionAt(points, t) {
+  let lo = 0;
+  let hi = points.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (points[mid].ts <= t) lo = mid;
+    else hi = mid - 1;
+  }
+  const a = points[lo];
+  const b = points[lo + 1];
+  if (!b || b.ts - a.ts > 120) return { ...a, report: a.ts };
+  // between two reports: move along the line between them, at the speed measured over it
+  const f = (t - a.ts) / (b.ts - a.ts);
+  return { lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + (b.lon - a.lon) * f, kmh: b.kmh, heading: b.heading, report: a.ts };
+}
+
+function vehiclesAt(t) {
+  const out = [];
+  for (const [id, list] of replay.vehicles) {
+    for (const track of list) {
+      const first = track.points[0].ts;
+      const last = track.points[track.points.length - 1].ts;
+      if (t < first || t > last + STALE_S) continue;
+      const p = positionAt(track.points, t);
+      out.push({
+        vehicle_id: id,
+        route_id: track.route,
+        tram: track.tram,
+        lat: p.lat,
+        lon: p.lon,
+        ts: p.report,
+        speed_kmh: p.kmh,
+        stopped: p.kmh < 3,
+        heading: p.heading < 0 ? null : p.heading,
+      });
+      break;
+    }
+  }
+  return out;
+}
+
+function showFrame(force = false) {
+  const t = replay.t;
+  state.clock = Math.floor(t);
+  const list = vehiclesAt(t);
+  const ids = new Set(list.map((v) => v.vehicle_id));
+  for (const [id, marker] of state.markers) {
+    if (!ids.has(id)) {
+      marker.remove();
+      state.markers.delete(id);
+    }
+  }
+  state.vehicles = new Map(list.map((v) => [v.vehicle_id, v]));
+  for (const v of list) placeVehicle(v);
+  drawBoard();
+
+  // the panel shows what the processor had published by this moment
+  const ms = t * 1000;
+  const lines = replay.data.lines.filter((w) => w.end <= ms);
+  const spots = replay.data.hotspots.filter((h) => h.end <= ms);
+  const alerts = replay.data.alerts.filter((a) => a.ts <= t);
+  const shown = `${lines.length}|${spots.length}|${alerts.length}`;
+  if (force || shown !== replay.shown) {
+    replay.shown = shown;
+    state.lines = {};
+    for (const w of lines) (state.lines[w.route_id] ??= []).push(w);
+    for (const route of Object.keys(state.lines)) state.lines[route] = state.lines[route].slice(-24);
+    const newest = Math.max(0, ...spots.map((h) => h.end));
+    state.hotspots = spots.filter((h) => h.end === newest);
+    state.alerts = alerts.slice().reverse();
+    drawLines();
+    drawAlerts();
+    drawSpots();
+  }
+  const scrub = $("scrub");
+  if (document.activeElement !== scrub) scrub.value = Math.floor(t);
+}
+
+let lastFrame = 0;
+let lastDraw = 0;
+function tick(now) {
+  const elapsed = lastFrame ? (now - lastFrame) / 1000 : 0;
+  lastFrame = now;
+  if (replay.playing) {
+    replay.t += elapsed * replay.speed;
+    if (replay.t >= replay.data.end) {
+      replay.t = replay.data.end;
+      setPlaying(false);
+    }
+  }
+  if (replay.playing && now - lastDraw > 100) {
+    lastDraw = now;
+    showFrame();
+  }
+  requestAnimationFrame(tick);
+}
+
+function setPlaying(playing) {
+  replay.playing = playing;
+  const button = $("play");
+  button.setAttribute("aria-label", playing ? "Zaustavi" : "Pokreni");
+  button.classList.toggle("paused", !playing);
+}
+
+function setupPlayer() {
+  $("player").hidden = false;
+  const scrub = $("scrub");
+  scrub.min = replay.data.start;
+  scrub.max = replay.data.end;
+  scrub.step = 15;
+  scrub.addEventListener("input", () => {
+    replay.t = Number(scrub.value);
+    showFrame();
+  });
+  $("play").addEventListener("click", () => {
+    if (!replay.playing && replay.t >= replay.data.end) replay.t = replay.data.start;
+    setPlaying(!replay.playing);
+  });
+  for (const button of document.querySelectorAll("#speeds button")) {
+    button.addEventListener("click", () => {
+      replay.speed = Number(button.dataset.speed);
+      for (const other of document.querySelectorAll("#speeds button")) other.setAttribute("aria-pressed", String(other === button));
+    });
+  }
+  $("replay-span").textContent = `${hhmm.format(replay.data.start * 1000)}–${hhmm.format(replay.data.end * 1000)}`;
+  setPlaying(true);
 }
 
 $("show-buses").addEventListener("change", (event) => {
@@ -435,5 +610,7 @@ $("show-spots").addEventListener("change", (event) => {
   drawSpots();
 });
 
-setInterval(() => refresh().catch(() => {}), 30_000);
+setInterval(() => {
+  if (!replay.data) refresh().catch(() => {});
+}, 30_000);
 start();

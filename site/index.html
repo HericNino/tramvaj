@@ -24,6 +24,16 @@
           <span id="status">spajam se</span>
           <span id="count"></span>
         </div>
+        <div class="player" id="player" hidden>
+          <button class="play" id="play" type="button" aria-label="Zaustavi"></button>
+          <input class="scrub" id="scrub" type="range" aria-label="Vrijeme u snimci" />
+          <div class="speeds" id="speeds" role="group" aria-label="Brzina reprodukcije">
+            <button type="button" data-speed="1" aria-pressed="false">1×</button>
+            <button type="button" data-speed="10" aria-pressed="true">10×</button>
+            <button type="button" data-speed="60" aria-pressed="false">60×</button>
+          </div>
+          <span class="span" id="replay-span"></span>
+        </div>
       </header>
 
       <div class="map" id="map" role="region" aria-label="Karta Zagreba s vozilima"></div>
@@ -79,7 +89,11 @@
             Položaji iz ZET-ova javnog GTFS-Realtime feeda, svakih desetak sekundi, provučeni kroz Kafku. Brzina se računa iz
             dva uzastopna položaja istog vozila.
           </p>
-          <p><a href="https://github.com/HericNino/tramvaj">Kod i opis</a> · <a href="api/live">api/live</a></p>
+          <p class="replay-note" hidden>
+            Ovo je snimka: sat vremena ZET-ova feeda, provučen kroz isti Kafka pipeline na GitHub Actionsu i spremljen kao
+            <a href="data/replay.json">replay.json</a>. Uživo karta radi uz Kafku, vidi upute u repou.
+          </p>
+          <p><a href="https://github.com/HericNino/tramvaj">Kod i opis</a><span class="api"> · <a href="api/live">api/live</a></span></p>
         </footer>
       </aside>
 

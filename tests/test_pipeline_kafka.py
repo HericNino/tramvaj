@@ -20,6 +20,7 @@ from confluent_kafka import OFFSET_BEGINNING, Consumer, TopicPartition
 from feeds import feed, ilica
 
 from tramvaj import topics
+from tramvaj.processor import wait_until_running
 from tramvaj.producer import FeedProducer
 
 BROKER = os.environ.get("KAFKA_BROKER")
@@ -89,10 +90,11 @@ def pipeline(tmp_path_factory):
     topics.ensure(BROKER)
 
     state = tmp_path_factory.mktemp("state")
-    command = [sys.executable, "-m", "tramvaj.cli", "process", "--grace", "120", "--state-dir", str(state)]
+    group = f"test{suffix}"
+    command = [sys.executable, "-m", "tramvaj.cli", "process", "--grace", "120", "--state-dir", str(state), "--group", group]
     processor = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     try:
-        time.sleep(8)  # let it join the group and create its internal topics
+        wait_until_running(BROKER, group)  # see wait_until_running: producing earlier makes a backlog
         producer = FeedProducer.connect(BROKER)
         for data in snapshots():
             producer.send(data)

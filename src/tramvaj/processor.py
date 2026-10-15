@@ -15,8 +15,11 @@ output and its consumer offsets are committed in one Kafka transaction.
 
 from __future__ import annotations
 
+import time
 from datetime import timedelta
 
+from confluent_kafka import ConsumerGroupState
+from confluent_kafka.admin import AdminClient
 from quixstreams import Application
 from quixstreams.dataframe.windows import Collect, Count, Max, Mean
 from quixstreams.models import TopicConfig
@@ -32,6 +35,7 @@ CELL_WINDOW = timedelta(minutes=10)
 # results come out a minute after each window; a replay at full speed needs more.
 GRACE = timedelta(seconds=60)
 MIN_HOTSPOT_SAMPLES = 6
+GROUP = "tramvaj"
 
 
 def event_time(value, headers, timestamp, timestamp_type) -> int:
@@ -138,7 +142,7 @@ def _count_stopped():
     return StoppedCount()
 
 
-def make_app(broker: str, group: str = "tramvaj", state_dir: str = "state", exactly_once: bool = True) -> Application:
+def make_app(broker: str, group: str = GROUP, state_dir: str = "state", exactly_once: bool = True) -> Application:
     return Application(
         broker_address=broker,
         consumer_group=group,
@@ -153,3 +157,22 @@ def run(broker: str, grace: timedelta = GRACE, **kwargs) -> None:
     app = make_app(broker, **kwargs)
     build(app, grace)
     app.run()
+
+
+def wait_until_running(broker: str, group: str = GROUP, timeout_s: float = 120) -> None:
+    """Block until the processor's consumer group is stable and has the positions topic assigned.
+
+    Positions produced before that pile up, and the processor then reads the backlog one
+    partition at a time. After regrouping by line, one partition's events arrive far ahead
+    of another's, the windows' grace runs out and the late ones are dropped. In CI the
+    processor took about 15 seconds to join; a fixed sleep before producing was not enough.
+    """
+    admin = AdminClient({"bootstrap.servers": broker})
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        description = admin.describe_consumer_groups([group])[group].result()
+        assigned = {tp.topic for member in description.members for tp in member.assignment.topic_partitions}
+        if description.state == ConsumerGroupState.STABLE and topics.POSITIONS.name in assigned:
+            return
+        time.sleep(1)
+    raise TimeoutError(f"processor group {group!r} did not start consuming {topics.POSITIONS.name} in {timeout_s} s")

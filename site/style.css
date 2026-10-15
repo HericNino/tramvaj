@@ -686,3 +686,98 @@ h2 .sub {
 .lines th.spark-h {
   padding-left: 10px;
 }
+
+/* playback controls, on the board: amber on black like the rest of it */
+.player {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "play scrub speeds" ". span span";
+  align-items: center;
+  gap: 2px 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #2a2b2e;
+}
+
+.player .play {
+  grid-area: play;
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid var(--led);
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+/* pause: two bars */
+.player .play::before,
+.player .play::after {
+  content: "";
+  position: absolute;
+  top: 9px;
+  width: 3px;
+  height: 10px;
+  background: var(--led);
+}
+.player .play::before {
+  left: 10px;
+}
+.player .play::after {
+  left: 15px;
+}
+
+/* play: a triangle */
+.player .play.paused::before {
+  left: 11px;
+  top: 8px;
+  width: 0;
+  height: 0;
+  background: none;
+  border-style: solid;
+  border-width: 6px 0 6px 10px;
+  border-color: transparent transparent transparent var(--led);
+}
+.player .play.paused::after {
+  display: none;
+}
+
+.player .scrub {
+  grid-area: scrub;
+  width: 100%;
+  accent-color: var(--led);
+  margin: 0;
+}
+
+.player .speeds {
+  grid-area: speeds;
+  display: flex;
+  gap: 2px;
+}
+
+.player .speeds button {
+  font: 500 12.5px/1 var(--mono);
+  color: var(--led-dim);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  padding: 4px 5px;
+  cursor: pointer;
+}
+
+.player .speeds button[aria-pressed="true"] {
+  color: var(--led);
+  border-color: var(--led-dim);
+}
+
+.player button:focus-visible,
+.player .scrub:focus-visible {
+  outline: 2px solid var(--led);
+  outline-offset: 2px;
+}
+
+.player .span {
+  grid-area: span;
+  font-size: 12px;
+  color: var(--led-dim);
+}
