@@ -55,7 +55,7 @@ def snapshots():
             yield b"<html>502 Bad Gateway</html>"
     for j in range(2):
         ts = LATER + j * 15
-        # along the same stretch of Ilica, so every grid cell that has data sees time move on
+        # forty trams along Ilica, so every partition of the regrouped streams sees time move on
         yield feed(ts + 1, [(f"3{n:03d}", "6", *ilica(ts, n * 125 + j * 75)) for n in range(40)])
 
 

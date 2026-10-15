@@ -41,7 +41,9 @@ MIN_HOTSPOT_SAMPLES = 6
 GROUP = "tramvaj"
 # Windows close when time on their partition passes end + grace, not only when the same key
 # (line, grid cell) shows up again. With Quix's default, per key, a cell's window stayed open
-# until a tram next drove through that cell, at night until morning.
+# until a tram next drove through that cell, at night until morning. The price: an event that
+# arrives within `grace` after its window closed is dropped without reaching `late()` (Quix
+# measures lateness from the last closed window here), so the late count is a lower bound.
 CLOSING = "partition"
 
 

@@ -44,7 +44,7 @@ ZET GTFS-RT feed (protobuf, whole network every ~10 s)
 **Out of order after regrouping.** Within a partition, positions are in order. After regrouping by line, a line's positions come from all six source partitions, in whatever order the processor reads them. When one source partition is ahead (a backlog after a restart, a fast replay), its events move the windows' clock forward and the others' look late, so windows close before their data has arrived. Three things came out of finding this:
 
 - Windows wait for late events (`--grace`, 60 s by default). Live, a minute is plenty; a fast replay needs more. Events that still come too late are counted and logged.
-- Windows close on partition time. By default Quix closes a key's window only when the same key shows up again: a grid cell's 10-minute window stayed open until a tram next drove through that cell, at night until morning. With `closing_strategy="partition"` a window closes once time on its partition passes its end plus the grace.
+- Windows close on partition time. By default Quix closes a key's window only when the same key shows up again: a grid cell's 10-minute window stayed open until a tram next drove through that cell, at night until morning. With `closing_strategy="partition"` a window closes once time on its partition passes its end plus the grace. The trade-off, found by testing both: in this mode an event that arrives shortly after its window closed is dropped without being reported as late (the default reports it, though it drops it too), so the logged count of late events is a lower bound.
 - Bunching compares two vehicles at the same moment. Each vehicle's position is projected along its heading to the other's report time before measuring the gap. Comparing raw positions, two trams 100 m apart could look hundreds of metres apart or on top of each other, depending on which one had reported last.
 
 **Start consuming before producing.** The pipeline test first waited a fixed 8 seconds for the processor before sending data. On GitHub Actions the processor took about 15 seconds to join its consumer group, the first positions piled up, and the processor then read that backlog one partition at a time: the same out-of-order problem as above, with windows missing events and a bunching alert missing. Producing without waiting reproduces it every time. Now the test, and `tramvaj produce --wait`, ask Kafka for the processor's consumer group and start once it is stable and has the positions topic assigned.
@@ -115,6 +115,7 @@ The pipeline test runs the producer and the processor side by side on a broker, 
 - Hotspots are squares of about 250 m, not street segments.
 - Bunching keeps each vehicle's latest position only, so two trams waiting at a terminus can be reported as bunched.
 - `zet.delays` is collected but not used yet.
+- The replay page never shows its last 5 to 10 minutes of windows: nothing comes after the final snapshot to move time past them.
 - The map's backend reads the windowed topics from the beginning when it starts, up to 30 days of them. Fine for one city; past that it should start from a recent offset.
 
 ## Data

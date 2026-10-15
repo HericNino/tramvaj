@@ -497,10 +497,14 @@ function positionAt(points, t) {
 function vehiclesAt(t) {
   const out = [];
   for (const [id, list] of replay.vehicles) {
-    for (const track of list) {
-      const first = track.points[0].ts;
-      const last = track.points[track.points.length - 1].ts;
-      if (t < first || t > last + STALE_S) continue;
+    // a vehicle that changed line has a track per line: take the newest one that has started
+    let track = null;
+    for (const candidate of list) {
+      const first = candidate.points[0].ts;
+      const last = candidate.points[candidate.points.length - 1].ts;
+      if (t >= first && t <= last + STALE_S && (!track || first > track.points[0].ts)) track = candidate;
+    }
+    if (track) {
       const p = positionAt(track.points, t);
       out.push({
         vehicle_id: id,
@@ -513,7 +517,6 @@ function vehiclesAt(t) {
         stopped: p.kmh < 3,
         heading: p.heading < 0 ? null : p.heading,
       });
-      break;
     }
   }
   return out;
