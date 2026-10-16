@@ -37,22 +37,15 @@ const map = L.map("map", { zoomControl: false, attributionControl: true, minZoom
 L.control.zoom({ position: "topleft" }).addTo(map);
 map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
 
+// OpenStreetMap's own tiles: no key needed. They are full colour, so style.css mutes them
+// (and turns them dark in dark mode) to keep the vehicles the brightest thing on the map.
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+}).addTo(map);
+
 const dark = window.matchMedia("(prefers-color-scheme: dark)");
-let tiles = null;
-function setTiles() {
-  if (tiles) tiles.remove();
-  const style = dark.matches ? "dark_all" : "light_all";
-  tiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`, {
-    subdomains: "abcd",
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-  }).addTo(map);
-}
-setTiles();
-dark.addEventListener("change", () => {
-  setTiles();
-  drawSpots();
-});
+dark.addEventListener("change", () => drawSpots());
 
 const spotLayer = L.layerGroup().addTo(map);
 const vehicleLayer = L.layerGroup().addTo(map);

@@ -120,7 +120,7 @@ The pipeline test runs the producer and the processor side by side on a broker, 
 
 ## Data
 
-Vehicle positions from ZET's public GTFS-Realtime feed (`https://www.zet.hr/gtfs-rt-protobuf`). Map tiles © OpenStreetMap contributors, © CARTO. Typefaces: Barlow Semi Condensed and IBM Plex Mono (SIL Open Font License, in `site/fonts`). Map library: Leaflet (BSD-2-Clause, in `site/vendor/leaflet`).
+Vehicle positions from ZET's public GTFS-Realtime feed (`https://www.zet.hr/gtfs-rt-protobuf`). Map tiles © OpenStreetMap contributors (OpenStreetMap's standard tiles, muted with a CSS filter). Typefaces: Barlow Semi Condensed and IBM Plex Mono (SIL Open Font License, in `site/fonts`). Map library: Leaflet (BSD-2-Clause, in `site/vendor/leaflet`).
 
 ## License
 

@@ -187,6 +187,17 @@ a {
   background: var(--paper);
 }
 
+/* OpenStreetMap's tiles are bright and colourful; quieten them so the vehicles stand out */
+.leaflet-tile-pane {
+  filter: grayscale(0.75) brightness(1.04) contrast(0.92);
+}
+
+@media (prefers-color-scheme: dark) {
+  .leaflet-tile-pane {
+    filter: invert(1) hue-rotate(180deg) grayscale(0.7) brightness(0.82) contrast(0.88);
+  }
+}
+
 /* keep Leaflet's attribution out from under the sheet */
 .leaflet-bottom.leaflet-right {
   right: calc(var(--sheet-w) + 2 * var(--gap));
