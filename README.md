@@ -86,7 +86,7 @@ uv run tramvaj serve                                  # map on http://localhost:
 
 ### The replay page
 
-The **Replay page** workflow records an hour of the feed on weekday mornings (or when run by hand), starts Kafka on the runner, runs the processor on the recording at ten times the speed, and exports everything it wrote with `tramvaj export`. The map finds no API on GitHub Pages and plays back `data/replay.json` instead, with a time slider. The same works locally:
+The **Replay page** workflow records an hour of the feed on weekday mornings (or when run by hand), starts Kafka on the runner, runs the processor on the recording at ten times the speed, and exports everything it wrote with `tramvaj export`. The map finds no API on GitHub Pages and plays back `data/replay.json` instead, with a time slider. If the feed is down for the whole recording, the workflow publishes the site with the last recording it had. The same works locally:
 
 ```bash
 uv run tramvaj process --group replay &

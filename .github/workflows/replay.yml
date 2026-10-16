@@ -33,10 +33,24 @@ jobs:
       - run: uv sync --locked --no-dev
       - run: docker run -d --name kafka -p 9092:9092 apache/kafka:3.9.1
       - name: Record the feed
-        run: uv run tramvaj record --minutes "$MINUTES" --out samples
+        id: record
+        run: |
+          if uv run tramvaj record --minutes "$MINUTES" --out samples; then
+            echo "fresh=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "fresh=false" >> "$GITHUB_OUTPUT"
+          fi
         env:
           MINUTES: ${{ inputs.minutes || '60' }}
+      # the feed was down the whole time: publish the site with the recording it has now
+      - name: Keep the last published recording
+        if: steps.record.outputs.fresh != 'true'
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          mkdir -p site/data
+          curl -fsS --retry 3 -o site/data/replay.json "https://${owner}.github.io/${GITHUB_REPOSITORY#*/}/data/replay.json"
       - name: Run the pipeline on the recording
+        if: steps.record.outputs.fresh == 'true'
         run: |
           # straight from the venv, not through uv run: a uv process left running holds uv's
           # cache lock, and setup-uv's cleanup then times out and fails the job

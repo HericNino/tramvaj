@@ -19,10 +19,11 @@ from .feed import FEED_URL
 log = logging.getLogger("tramvaj")
 
 
-def live(url: str = FEED_URL, interval_s: float = 10.0, client: httpx.Client | None = None) -> Iterator[bytes]:
-    """Poll the feed forever. Network errors are logged and retried on the next tick."""
+def live(url: str = FEED_URL, interval_s: float = 10.0, client: httpx.Client | None = None, until: float | None = None) -> Iterator[bytes]:
+    """Poll the feed, forever or until time.monotonic() reaches `until`. Network errors are
+    logged and retried on the next tick, so while the feed is down nothing is yielded."""
     client = client or httpx.Client(timeout=10, headers={"User-Agent": "tramvaj (github.com/HericNino/tramvaj)"})
-    while True:
+    while until is None or time.monotonic() < until:
         started = time.monotonic()
         try:
             response = client.get(url)
@@ -83,14 +84,17 @@ def shift(data: bytes, seconds: int) -> bytes:
     return message.SerializeToString()
 
 
-def record(out: Path, minutes: float, interval_s: float = 15.0, url: str = FEED_URL) -> int:
-    """Save live snapshots as <feed timestamp>.pb.gz. Returns how many were new."""
+def record(out: Path, minutes: float, interval_s: float = 15.0, url: str = FEED_URL, client: httpx.Client | None = None) -> int:
+    """Save live snapshots as <feed timestamp>.pb.gz for `minutes`. Returns how many were new.
+
+    The deadline goes to `live` itself: while the feed is down `live` yields nothing, and a
+    check in this loop would never be reached (a recording on CI ran until the job's timeout)."""
     from .feed import FeedError, decode
 
     out.mkdir(parents=True, exist_ok=True)
     saved = 0
     deadline = time.monotonic() + minutes * 60
-    for data in live(url, interval_s):
+    for data in live(url, interval_s, client=client, until=deadline):
         try:
             stamp = decode(data).ts
         except FeedError as error:
@@ -100,6 +104,4 @@ def record(out: Path, minutes: float, interval_s: float = 15.0, url: str = FEED_
             if not path.exists():
                 path.write_bytes(gzip.compress(data, mtime=0))
                 saved += 1
-        if time.monotonic() >= deadline:
-            return saved
     return saved

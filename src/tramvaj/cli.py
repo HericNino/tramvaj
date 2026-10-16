@@ -92,6 +92,8 @@ def main(argv: list[str] | None = None) -> int:
         out = args.out or Path("samples")
         saved = sources.record(out, args.minutes)
         log.info("saved %d snapshots to %s", saved, out)
+        if not saved:
+            sys.exit("no snapshots recorded: the feed was unavailable the whole time")
     elif args.command == "export":
         from .export import export
 
